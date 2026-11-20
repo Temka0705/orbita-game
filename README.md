@@ -6,7 +6,7 @@
 
 <p align="center">Аркада на одну кнопку: срывайся с орбиты звезды и лови кольцо следующей.</p>
 
-<p align="center"><b><a href="__SITE_URL__">▶ Играть</a></b></p>
+<p align="center"><b><a href="https://temka0705.github.io/orbita-game/">▶ Играть</a></b></p>
 
 ---
 
