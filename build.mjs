@@ -34,9 +34,21 @@ img { max-width: 100%; }
 <body>
 `;
 
+const BUILD = Date.now().toString(36);
 const tail = `
 <script>
-  if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  window.ORBITA_BUILD = '${BUILD}';
+  if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {}));
+  // Home-screen apps resume old code from memory instead of reloading.
+  // When the app comes back to the foreground, check for a newer build and reload into it.
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) return;
+    try {
+      const html = await (await fetch('index.html?v=' + Date.now(), { cache: 'no-store' })).text();
+      const m = html.match(/ORBITA_BUILD = '([^']+)'/);
+      if (m && m[1] !== window.ORBITA_BUILD) location.reload();
+    } catch (e) {}
+  });
 </script>
 </body>
 </html>

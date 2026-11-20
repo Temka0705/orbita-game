@@ -1,6 +1,6 @@
 // Offline support. Own files: network first (always fresh online), cache as fallback.
 // Google Fonts: cache first (they never change for a given URL).
-const CACHE = 'orbita-v1';
+const CACHE = 'orbita-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
