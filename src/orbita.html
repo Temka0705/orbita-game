@@ -61,7 +61,8 @@ button:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   text-align: center;
-  background: color-mix(in srgb, var(--bg) 74%, transparent);
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+  backdrop-filter: blur(3px);
   overflow-y: auto;
   touch-action: pan-y;
 }
@@ -147,7 +148,6 @@ button:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
     </div>
     <div id="side">
       <div>◆ <b id="runGems">0</b></div>
-      <div id="fps" style="font-size:10px;opacity:.7"></div>
       <button class="mini" id="quit" type="button">МЕНЮ</button>
       <button class="mini" id="mute" type="button">ЗВУК: ВКЛ</button>
     </div>
@@ -170,7 +170,6 @@ button:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
       <button class="btn ghost sq" data-open="help" type="button" aria-label="Справочник">?</button>
     </div>
     <div class="kbd">пробел / клик / тап — сорваться с орбиты</div>
-    <button class="mini" id="gfxBtn" type="button">ГРАФИКА: ПОЛНАЯ</button>
     <div class="kbd" id="cloud" data-s="loading">загружаю сохранение…</div>
   </div>
 
@@ -310,7 +309,7 @@ button:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
     delete S.ach.lastsec;
   }
   migrate(); saveLocal();
-  let lite = S.gfx === 'low';
+  const lite = false; delete S.gfx;
 
   // ---- cloud save: one private document per player in the artifact's db, tied to the claude.ai account ----
   let cloudRef = null, cloudReady = false, cloudState = 'loading', cloudBusy = false, cloudDirty = false, cloudTimer = null;
@@ -588,7 +587,6 @@ button:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
     $$('.gemCount').forEach(e => e.textContent = S.gems);
     $$('[data-best]').forEach(e => { const b = S.best[e.dataset.best]; e.textContent = b ? 'рекорд ' + b : ''; });
     $('challSub').textContent = `пройдено ${Math.min(S.chall, CH.length)} из ${CH.length}`;
-    $('gfxBtn').textContent = lite ? 'ГРАФИКА: ЛЁГКАЯ' : 'ГРАФИКА: ПОЛНАЯ';
   }
   function renderChall() {
     $('challList').innerHTML = CH.map((c, i) => {
@@ -735,11 +733,6 @@ button:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
   });
   muteBtn.addEventListener('pointerdown', e => e.stopPropagation());
   muteBtn.addEventListener('click', e => { e.stopPropagation(); S.mute = !S.mute; syncMute(); save(); muteBtn.blur(); });
-  $('gfxBtn').addEventListener('click', () => {
-    lite = !lite; S.gfx = lite ? 'low' : 'high';
-    dprCap = lite ? 1.5 : Math.min(3, window.devicePixelRatio || 1); resize();
-    save(); renderMenu();
-  });
   $('quit').addEventListener('pointerdown', e => e.stopPropagation());
   $('quit').addEventListener('click', e => { e.stopPropagation(); endRun('', true); });
   $('againBtn').addEventListener('click', e => { e.stopPropagation(); again(); });
@@ -941,23 +934,12 @@ button:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
   // in-place removal: no new arrays every frame, so no garbage-collector hitches on phones
   function prune(arr, keep) { let j = 0; for (let i = 0; i < arr.length; i++) if (keep(arr[i])) arr[j++] = arr[i]; arr.length = j; return arr; }
 
-  // ================= GLOW SPRITES =================
-  // radial gradients and shadowBlur every frame are what kills phones; pre-render each glow once and stamp it
-  const glowCache = {};
-  function glow(c, rgb, alpha, x, y, r, force) {
-    if (lite && !force && c === ctx) return;
-    const key = rgb + '|' + alpha;
-    let s = glowCache[key];
-    if (!s) {
-      s = document.createElement('canvas'); s.width = s.height = 64;
-      const g2 = s.getContext('2d'), gr = g2.createRadialGradient(32, 32, 0, 32, 32, 32);
-      gr.addColorStop(0, `rgba(${rgb},${alpha})`); gr.addColorStop(1, `rgba(${rgb},0)`);
-      g2.fillStyle = gr; g2.fillRect(0, 0, 64, 64);
-      glowCache[key] = s;
-    }
-    c.drawImage(s, x - r, y - r, r * 2, r * 2);
+  // ================= GLOW =================
+  function glow(c, rgb, alpha, x, y, r) {
+    const g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${rgb},${alpha})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fill();
   }
-  const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
 
   // ================= SKIN DRAWING =================
   function starPath(c, x, y, r, rot) {
@@ -1119,18 +1101,16 @@ button:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
       if (p.got) continue;
       p.rot += .03;
       if (p.type === 'gem') {
-        glow(ctx, '108,243,213', .55, p.x, p.y, 18);
         ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-        ctx.fillStyle = C.shard;
+        ctx.fillStyle = C.shard; ctx.shadowColor = C.shard; ctx.shadowBlur = 12;
         ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(6, 0); ctx.lineTo(0, 8); ctx.lineTo(-6, 0); ctx.closePath(); ctx.fill();
         ctx.restore();
       } else {
         const d = POW[p.type], bob = Math.sin(T * 3 + p.x) * 3;
         ctx.save(); ctx.translate(p.x, p.y + bob);
-        glow(ctx, hexRgb(d.col), .6, 0, 0, 26);
-        ctx.fillStyle = '#161a4a'; ctx.strokeStyle = d.col; ctx.lineWidth = 2;
+        ctx.fillStyle = '#161a4a'; ctx.strokeStyle = d.col; ctx.lineWidth = 2; ctx.shadowColor = d.col; ctx.shadowBlur = 14;
         ctx.beginPath(); ctx.arc(0, 0, 12, 0, 6.283); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = d.col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 0; ctx.fillStyle = d.col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.fillText(d.glyph, 0, 1);
         ctx.restore();
       }
@@ -1223,27 +1203,8 @@ button:focus-visible { outline: 2px solid var(--sun); outline-offset: 3px; }
 
   // ================= LOOP =================
   let last = performance.now();
-  let perfAcc = 0, perfN = 0, perfMax = 0, fpsEl = $('fps'), dtS = 1 / 60;
   function frame(now) {
-    const raw = (now - last) / 1000; last = now;
-    // smoothed step: irregular frame timestamps (embedded views, ProMotion) otherwise show up as visible judder
-    dtS += (Math.min(.05, raw) - dtS) * .25;
-    const dt = dtS;
-    // fps meter + adaptive quality: a slow run first switches to light graphics, then lowers resolution
-    if (state === 'play' && raw < .25) {
-      perfAcc += raw; perfN++; perfMax = Math.max(perfMax, raw);
-      if (perfN >= 60) {
-        const avg = perfAcc / perfN;
-        fpsEl.textContent = `${Math.round(1 / avg)} FPS · ${dpr}x · пик ${Math.round(perfMax * 1000)}мс${lite ? ' · лёгкая' : ''}`;
-        // a steady ~30 fps is the system's cap (Low Power Mode, embedded view), not overload: lowering quality would not help
-        const capped30 = Math.abs(avg - 1 / 30) < .003 && perfMax < .045;
-        if (avg > .024 && !capped30) {
-          if (!lite) { lite = true; toast('Включил лёгкую графику', 'Вернуть полную можно в меню'); }
-          else if (dprCap > 1) { dprCap = Math.max(1, dprCap - .25); resize(); }
-        }
-        perfAcc = 0; perfN = 0; perfMax = 0;
-      }
-    }
+    const dt = Math.min(.033, (now - last) / 1000); last = now;
     update(dt); draw();
     requestAnimationFrame(frame);
   }
